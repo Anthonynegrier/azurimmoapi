@@ -13,9 +13,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
-@RequestMapping("/appartement")
+@RequestMapping("/appartements")
 @Tag(name = "Appartements", description = "Gestion des appartements")
 public class AppartementController {
 
@@ -25,7 +26,7 @@ public class AppartementController {
         this.appartementService = appartementService;
     }
 
-    @GetMapping("s")
+    @GetMapping
     @Operation(summary = "Récupérer tous les appartements", description = "Retourne la liste de tous les appartements")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Liste des appartements récupérée avec succès",
@@ -34,32 +35,6 @@ public class AppartementController {
     })
     public ResponseEntity<Iterable<Appartement>> getAllAppartements() {
         return ResponseEntity.ok(appartementService.getAppartements());
-    }
-
-    @GetMapping("/ville/{ville}")
-    @Operation(summary = "Rechercher des appartements par ville", description = "Retourne les appartements situés dans une ville spécifique")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Appartements de la ville récupérés avec succès",
-                    content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Appartement.class)))
-    })
-    public ResponseEntity<List<Appartement>> findByVille(
-            @Parameter(description = "Nom de la ville", required = true)
-            @PathVariable String ville) {
-        return ResponseEntity.ok(appartementService.getAppartementsByVille(ville));
-    }
-
-    @GetMapping("/batiment/{batimentId}")
-    @Operation(summary = "Rechercher des appartements par bâtiment", description = "Retourne les appartements d'un bâtiment spécifique")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Appartements du bâtiment récupérés avec succès",
-                    content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Appartement.class)))
-    })
-    public ResponseEntity<List<Appartement>> findByBatimentId(
-            @Parameter(description = "ID du bâtiment", required = true)
-            @PathVariable long batimentId) {
-        return ResponseEntity.ok(appartementService.getAppartementsParBatiment(batimentId));
     }
 
     @GetMapping("/{id}")
@@ -73,9 +48,9 @@ public class AppartementController {
     public ResponseEntity<Appartement> getAppartement(
             @Parameter(description = "ID de l'appartement", required = true)
             @PathVariable Long id) {
-        Appartement appartement = appartementService.getAppartementById(id)
-                .orElseThrow(() -> new RuntimeException("Appartement non trouvé"));
-        return ResponseEntity.ok(appartement);
+        return appartementService.getAppartementById(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
@@ -88,7 +63,34 @@ public class AppartementController {
     public ResponseEntity<Appartement> addAppartement(
             @Parameter(description = "Détails de l'appartement à ajouter", required = true)
             @RequestBody Appartement appartement) {
-        return ResponseEntity.ok(appartementService.saveAppartement(appartement));
+        Appartement savedAppartement = appartementService.saveAppartement(appartement);
+        return ResponseEntity.ok(savedAppartement);
+    }
+
+    @GetMapping("/batiment/{id}")
+    @Operation(summary = "Récupérer tous les appartements d'un bâtiment", description = "Retourne la liste des appartements d'un bâtiment spécifique")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Liste des appartements récupérée avec succès",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Appartement.class)))
+    })
+    public ResponseEntity<List<Appartement>> getAppartementsByBatiment(
+            @Parameter(description = "ID du bâtiment", required = true)
+            @PathVariable Long id) {
+        return ResponseEntity.ok(appartementService.getAppartementsParBatiment(id));
+    }
+
+    @GetMapping("/ville/{ville}")
+    @Operation(summary = "Récupérer tous les appartements d'une ville", description = "Retourne la liste des appartements situés dans une ville spécifique")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Liste des appartements récupérée avec succès",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Appartement.class)))
+    })
+    public ResponseEntity<List<Appartement>> getAppartementsByVille(
+            @Parameter(description = "Nom de la ville", required = true)
+            @PathVariable String ville) {
+        return ResponseEntity.ok(appartementService.getAppartementsByVille(ville));
     }
 
     @PutMapping("/{id}")
@@ -104,26 +106,32 @@ public class AppartementController {
             @PathVariable Long id,
             @Parameter(description = "Nouvelles informations de l'appartement", required = true)
             @RequestBody Appartement appartement) {
-        Appartement currentAppartement = appartementService.getAppartementById(id)
-                .orElseThrow(() -> new RuntimeException("Appartement non trouvé"));
+        Optional<Appartement> existingAppartementOpt = appartementService.getAppartementById(id);
 
-        if (appartement.getDescription() != null) {
-            currentAppartement.setDescription(appartement.getDescription());
-        }
-        if (appartement.getNbPiece() != null) {
-            currentAppartement.setNbPiece(appartement.getNbPiece());
-        }
-        if (appartement.getNumero() != null) {
-            currentAppartement.setNumero(appartement.getNumero());
-        }
-        if (appartement.getSurface() != null) {
-            currentAppartement.setSurface(appartement.getSurface());
-        }
-        if (appartement.getBatiment() != null) {
-            currentAppartement.setBatiment(appartement.getBatiment());
-        }
+        if (existingAppartementOpt.isPresent()) {
+            Appartement currentAppartement = existingAppartementOpt.get();
 
-        return ResponseEntity.ok(appartementService.saveAppartement(currentAppartement));
+            if (appartement.getNumero() != null) {
+                currentAppartement.setNumero(appartement.getNumero());
+            }
+            if (appartement.getSurface() != null) {
+                currentAppartement.setSurface(appartement.getSurface());
+            }
+            if (appartement.getNbPiece() != null) {
+                currentAppartement.setNbPiece(appartement.getNbPiece());
+            }
+            if (appartement.getDescription() != null) {
+                currentAppartement.setDescription(appartement.getDescription());
+            }
+            if (appartement.getBatiment() != null) {
+                currentAppartement.setBatiment(appartement.getBatiment());
+            }
+
+            Appartement updatedAppartement = appartementService.saveAppartement(currentAppartement);
+            return ResponseEntity.ok(updatedAppartement);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -135,7 +143,10 @@ public class AppartementController {
     public ResponseEntity<Void> deleteAppartement(
             @Parameter(description = "ID de l'appartement à supprimer", required = true)
             @PathVariable Long id) {
-        appartementService.deleteAppartement(id);
-        return ResponseEntity.noContent().build();
+        if (appartementService.getAppartementById(id).isPresent()) {
+            appartementService.deleteAppartement(id);
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
     }
 }

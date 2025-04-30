@@ -18,7 +18,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/reparations")
-@Tag(name = "Réparations", description = "Gestion des réparations")
+@Tag(name = "reparations", description = "Gestion des réparations")
 public class ReparationController {
 
     @Autowired
